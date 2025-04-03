@@ -1,7 +1,8 @@
 # 🌡️✨ **Air Quality Monitoring System** ✨🌫️  
 
 *A smart IoT project using **ESP32 & BME680/BME688** to monitor indoor air quality (IAQ) in real-time!*  
-![Uploading Screenshot 2025-04-03 at 10.00.18 PM.png…]()
+
+![Screenshot 2025-04-03 at 10 00 18 PM](https://github.com/user-attachments/assets/53ea5f31-6153-4325-82a3-2dbbb6204233)
 
 🚀 **Deploy your own air quality station** that measures:  
 - **Temperature** 🌡️  
