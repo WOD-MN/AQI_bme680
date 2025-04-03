@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BME680 Environmental Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@2.0.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --accent-color: #4cc9f0;
+            --danger-color: #f72585;
+            --success-color: #4ad66d;
+            --warning-color: #f77f00;
+            --dark-color: #1a1a2e;
+            --light-color: #f8f9fa;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 1rem 0;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .dashboard-title {
+            font-weight: 700;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .dashboard-title i {
+            margin-right: 10px;
+            font-size: 1.5rem;
+        }
+        
+        .dashboard-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            padding: 0 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
+            border: none;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .card-header i {
+            margin-right: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .card-body {
+            padding: 1.25rem;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+        
+        .value-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .value-display i {
+            margin-right: 10px;
+        }
+        
+        .unit {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-left: 5px;
+        }
+        
+        .trend-indicator {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        
+        .trend-up {
+            color: var(--danger-color);
+        }
+        
+        .trend-down {
+            color: var(--success-color);
+        }
+        
+        .trend-neutral {
+            color: var(--accent-color);
+        }
+        
+        .status-badge {
+            padding: 0.35rem 0.5rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-normal {
+            background-color: rgba(74, 214, 109, 0.15);
+            color: var(--success-color);
+        }
+        
+        .status-warning {
+            background-color: rgba(247, 127, 0, 0.15);
+            color: var(--warning-color);
+        }
+        
+        .status-danger {
+            background-color: rgba(247, 37, 133, 0.15);
+            color: var(--danger-color);
+        }
+        
+        .last-updated {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .sensor-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+        
+        .sensor-label {
+            font-weight: 600;
+            color: #6c757d;
+        }
+        
+        .sensor-value {
+            font-weight: 700;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .btn-export {
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-export:hover {
+            background-color: #3ac55a;
+        }
+        
+        .btn-refresh {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-refresh:hover {
+            background-color: #3ab8d9;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem;
+            background-color: var(--success-color);
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateX(200%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.error {
+            background-color: var(--danger-color);
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .data-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .data-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .dashboard-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .value-display {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="dashboard-header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="dashboard-title"><i class="fas fa-chart-line"></i> BME680 Environmental Dashboard</h1>
+                <div class="dashboard-controls">
+                    <button id="refresh-btn" class="btn-refresh">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                    <button id="export-btn" class="btn-export">
+                        <i class="fas fa-file-excel"></i> Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="dashboard-container">
+            <!-- Temperature Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-thermometer-half"></i>
+                        Temperature
+                    </div>
+                    <div id="temp-status" class="status-badge status-normal">Normal</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-thermometer-half" style="color: var(--danger-color);"></i>
+                        <span id="temp-value">--</span>
+                        <span class="unit">°C</span>
+                        <span id="temp-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="temp-min" class="sensor-value">--°C</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="temp-max" class="sensor-value">--°C</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="temp-avg" class="sensor-value">--°C</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Humidity Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-tint"></i>
+                        Humidity
+                    </div>
+                    <div id="humidity-status" class="status-badge status-normal">Normal</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-tint" style="color: var(--accent-color);"></i>
+                        <span id="humidity-value">--</span>
+                        <span class="unit">%</span>
+                        <span id="humidity-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="humidityChart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="humidity-min" class="sensor-value">--%</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="humidity-max" class="sensor-value">--%</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="humidity-avg" class="sensor-value">--%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- IAQ Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-wind"></i>
+                        Air Quality (IAQ)
+                    </div>
+                    <div id="iaq-status" class="status-badge status-normal">Excellent</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-wind" style="color: var(--success-color);"></i>
+                        <span id="iaq-value">--</span>
+                        <span id="iaq-category" class="status-badge status-normal">--</span>
+                        <span id="iaq-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="iaqChart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="iaq-min" class="sensor-value">--</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="iaq-max" class="sensor-value">--</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="iaq-avg" class="sensor-value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CO2 Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-cloud"></i>
+                        CO₂ Equivalent
+                    </div>
+                    <div id="co2-status" class="status-badge status-normal">Normal</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-cloud" style="color: var(--warning-color);"></i>
+                        <span id="co2-value">--</span>
+                        <span class="unit">ppm</span>
+                        <span id="co2-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="co2Chart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="co2-min" class="sensor-value">--ppm</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="co2-max" class="sensor-value">--ppm</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="co2-avg" class="sensor-value">--ppm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pressure Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-tachometer-alt"></i>
+                        Pressure
+                    </div>
+                    <div id="pressure-status" class="status-badge status-normal">Normal</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-tachometer-alt" style="color: var(--primary-color);"></i>
+                        <span id="pressure-value">--</span>
+                        <span class="unit">hPa</span>
+                        <span id="pressure-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="pressureChart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="pressure-min" class="sensor-value">--hPa</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="pressure-max" class="sensor-value">--hPa</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="pressure-avg" class="sensor-value">--hPa</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VOC Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-smog"></i>
+                        VOC
+                    </div>
+                    <div id="voc-status" class="status-badge status-normal">Normal</div>
+                </div>
+                <div class="card-body">
+                    <div class="value-display">
+                        <i class="fas fa-smog" style="color: var(--secondary-color);"></i>
+                        <span id="voc-value">--</span>
+                        <span class="unit">ppm</span>
+                        <span id="voc-trend" class="trend-indicator"></span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="vocChart"></canvas>
+                    </div>
+                    <div class="sensor-info">
+                        <div>
+                            <span class="sensor-label">Min:</span>
+                            <span id="voc-min" class="sensor-value">--ppm</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Max:</span>
+                            <span id="voc-max" class="sensor-value">--ppm</span>
+                        </div>
+                        <div>
+                            <span class="sensor-label">Avg:</span>
+                            <span id="voc-avg" class="sensor-value">--ppm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Data Log Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <i class="fas fa-database"></i>
+                        Recent Data Log
+                    </div>
+                    <div class="status-badge status-normal">Last 10 readings</div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Temp (°C)</th>
+                                    <th>Humidity (%)</th>
+                                    <th>IAQ</th>
+                                    <th>CO₂ (ppm)</th>
+                                    <th>Pressure (hPa)</th>
+                                    <th>VOC (ppm)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-log">
+                                <!-- Data will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="last-updated">
+            <i class="fas fa-sync-alt"></i> Last updated: <span id="last-updated">Never</span>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notification-message">Data exported successfully!</span>
+    </div>
+    
+    <footer class="footer">
+        <div class="container">
+            <p>BME680 Environmental Sensor Dashboard &copy; <span id="year"></span> | Refresh rate: <span id="refresh-rate">5</span> seconds | Device: <span id="sensor-id">--</span></p>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize charts
+        const tempCtx = document.getElementById('temperatureChart').getContext('2d');
+        const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+        const iaqCtx = document.getElementById('iaqChart').getContext('2d');
+        const co2Ctx = document.getElementById('co2Chart').getContext('2d');
+        const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+        const vocCtx = document.getElementById('vocChart').getContext('2d');
+        
+        // Data storage for calculations
+        const sensorData = {
+            temperature: [],
+            humidity: [],
+            iaq: [],
+            co2: [],
+            pressure: [],
+            voc: [],
+            timestamps: [],
+            iaqCategories: []
+        };
+        
+        // Chart configurations
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 1000
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toFixed(2);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'minute',
+                        displayFormats: {
+                            minute: 'HH:mm'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                }
+            },
+            elements: {
+                point: {
+                    radius: 0,
+                    hitRadius: 10,
+                    hoverRadius: 5
+                },
+                line: {
+                    tension: 0.4,
+                    borderWidth: 2
+                }
+            }
+        };
+        
+        const temperatureChart = new Chart(tempCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    data: [],
+                    borderColor: 'rgba(247, 37, 133, 0.8)',
+                    backgroundColor: 'rgba(247, 37, 133, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        const humidityChart = new Chart(humidityCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Humidity (%)',
+                    data: [],
+                    borderColor: 'rgba(76, 201, 240, 0.8)',
+                    backgroundColor: 'rgba(76, 201, 240, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        const iaqChart = new Chart(iaqCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'IAQ',
+                    data: [],
+                    borderColor: 'rgba(74, 214, 109, 0.8)',
+                    backgroundColor: 'rgba(74, 214, 109, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        const co2Chart = new Chart(co2Ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CO₂ (ppm)',
+                    data: [],
+                    borderColor: 'rgba(247, 127, 0, 0.8)',
+                    backgroundColor: 'rgba(247, 127, 0, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        const pressureChart = new Chart(pressureCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Pressure (hPa)',
+                    data: [],
+                    borderColor: 'rgba(67, 97, 238, 0.8)',
+                    backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        const vocChart = new Chart(vocCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'VOC (ppm)',
+                    data: [],
+                    borderColor: 'rgba(63, 55, 201, 0.8)',
+                    backgroundColor: 'rgba(63, 55, 201, 0.1)',
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+        
+        // Set current year in footer
+        document.getElementById('year').textContent = new Date().getFullYear();
+        
+        // Show notification
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            const notificationMessage = document.getElementById('notification-message');
+            
+            notificationMessage.textContent = message;
+            notification.className = isError ? 'notification error show' : 'notification show';
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.className = notification.className.replace('show', '');
+            }, 3000);
+        }
+        
+        // Export data to Excel
+        function exportToExcel() {
+            try {
+                // Prepare data for export
+                const exportData = sensorData.timestamps.map((timestamp, index) => ({
+                    Timestamp: timestamp.toLocaleString(),
+                    Temperature: sensorData.temperature[index],
+                    Humidity: sensorData.humidity[index],
+                    IAQ: sensorData.iaq[index],
+                    'IAQ Category': sensorData.iaqCategories[index],
+                    CO2: sensorData.co2[index],
+                    Pressure: sensorData.pressure[index],
+                    VOC: sensorData.voc[index],
+                    'Sensor ID': document.getElementById('sensor-id').textContent
+                }));
+                
+                // Create worksheet
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "SensorData");
+                
+                // Export to file
+                XLSX.writeFile(wb, `BME680_Data_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                
+                showNotification("Data exported successfully!");
+            } catch (error) {
+                console.error('Error exporting data:', error);
+                showNotification("Error exporting data", true);
+            }
+        }
+        
+        // Update data log table
+        function updateDataLog() {
+            const dataLog = document.getElementById('data-log');
+            dataLog.innerHTML = '';
+            
+            // Show last 10 readings in reverse order (newest first)
+            const startIndex = Math.max(0, sensorData.timestamps.length - 10);
+            const endIndex = sensorData.timestamps.length;
+            
+            for (let i = endIndex - 1; i >= startIndex && i >= 0; i--) {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${sensorData.timestamps[i].toLocaleTimeString()}</td>
+                    <td>${sensorData.temperature[i]?.toFixed(1) || '--'}</td>
+                    <td>${sensorData.humidity[i]?.toFixed(0) || '--'}</td>
+                    <td>${sensorData.iaq[i]?.toFixed(0) || '--'}</td>
+                    <td>${sensorData.co2[i]?.toFixed(0) || '--'}</td>
+                    <td>${sensorData.pressure[i]?.toFixed(0) || '--'}</td>
+                    <td>${sensorData.voc[i]?.toFixed(2) || '--'}</td>
+                `;
+                
+                dataLog.appendChild(row);
+            }
+        }
+        
+        // Fetch real sensor data from server
+        async function fetchSensorData() {
+            try {
+                const response = await fetch('/data');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                
+                if (!data || typeof data !== 'object') {
+                    throw new Error('Invalid data format received');
+                }
+                
+                const now = new Date();
+                
+                // Update sensor data storage
+                if (data.temperature !== undefined) {
+                    sensorData.temperature.push(data.temperature);
+                }
+                if (data.humidity !== undefined) {
+                    sensorData.humidity.push(data.humidity);
+                }
+                if (data.iaq !== undefined) {
+                    sensorData.iaq.push(data.iaq);
+                }
+                if (data.co2 !== undefined) {
+                    sensorData.co2.push(data.co2);
+                }
+                if (data.pressure !== undefined) {
+                    sensorData.pressure.push(data.pressure);
+                }
+                if (data.voc !== undefined) {
+                    sensorData.voc.push(data.voc);
+                }
+                sensorData.timestamps.push(now);
+                if (data.iaq_category !== undefined) {
+                    sensorData.iaqCategories.push(data.iaq_category);
+                }
+                
+                // Update sensor ID if available
+                if (data.sensor_id) {
+                    document.getElementById('sensor-id').textContent = data.sensor_id;
+                }
+                
+                // Keep only the last 20 readings
+                const maxReadings = 20;
+                if (sensorData.temperature.length > maxReadings) {
+                    sensorData.temperature.shift();
+                    sensorData.humidity.shift();
+                    sensorData.iaq.shift();
+                    sensorData.co2.shift();
+                    sensorData.pressure.shift();
+                    sensorData.voc.shift();
+                    sensorData.timestamps.shift();
+                    sensorData.iaqCategories.shift();
+                }
+                
+                // Update charts
+                updateCharts();
+                
+                // Update display values
+                updateDisplayValues(data);
+                
+                // Update data log table
+                updateDataLog();
+                
+                // Update last updated time
+                document.getElementById('last-updated').textContent = now.toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('Error fetching sensor data:', error);
+                showNotification("Error fetching sensor data", true);
+            }
+        }
+        
+        function updateCharts() {
+            // Update all charts
+            temperatureChart.data.labels = sensorData.timestamps;
+            temperatureChart.data.datasets[0].data = sensorData.temperature;
+            temperatureChart.update();
+            
+            humidityChart.data.labels = sensorData.timestamps;
+            humidityChart.data.datasets[0].data = sensorData.humidity;
+            humidityChart.update();
+            
+            iaqChart.data.labels = sensorData.timestamps;
+            iaqChart.data.datasets[0].data = sensorData.iaq;
+            iaqChart.update();
+            
+            co2Chart.data.labels = sensorData.timestamps;
+            co2Chart.data.datasets[0].data = sensorData.co2;
+            co2Chart.update();
+            
+            pressureChart.data.labels = sensorData.timestamps;
+            pressureChart.data.datasets[0].data = sensorData.pressure;
+            pressureChart.update();
+            
+            vocChart.data.labels = sensorData.timestamps;
+            vocChart.data.datasets[0].data = sensorData.voc;
+            vocChart.update();
+        }
+        
+        function updateDisplayValues(data) {
+            // Temperature
+            if (data.temperature !== undefined) {
+                const tempElement = document.getElementById('temp-value');
+                const prevTemp = parseFloat(tempElement.textContent) || data.temperature;
+                const tempTrend = document.getElementById('temp-trend');
+                
+                tempElement.textContent = data.temperature.toFixed(1);
+                updateTrendIndicator(tempTrend, data.temperature, prevTemp);
+                updateStatus('temp', data.temperature, 10, 30); // Normal range 10-30°C
+            }
+            
+            // Humidity
+            if (data.humidity !== undefined) {
+                const humidityElement = document.getElementById('humidity-value');
+                const prevHumidity = parseFloat(humidityElement.textContent) || data.humidity;
+                const humidityTrend = document.getElementById('humidity-trend');
+                
+                humidityElement.textContent = data.humidity.toFixed(0);
+                updateTrendIndicator(humidityTrend, data.humidity, prevHumidity);
+                updateStatus('humidity', data.humidity, 30, 70); // Normal range 30-70%
+            }
+            
+            // IAQ
+            if (data.iaq !== undefined) {
+                const iaqElement = document.getElementById('iaq-value');
+                const prevIaq = parseFloat(iaqElement.textContent) || data.iaq;
+                const iaqTrend = document.getElementById('iaq-trend');
+                
+                iaqElement.textContent = data.iaq.toFixed(0);
+                updateTrendIndicator(iaqTrend, data.iaq, prevIaq);
+                
+                // Update IAQ category
+                if (data.iaq_category) {
+                    const iaqCategoryElement = document.getElementById('iaq-category');
+                    iaqCategoryElement.textContent = data.iaq_category;
+                    
+                    // Set color based on category
+                    if (data.iaq_category === "Excellent") {
+                        iaqCategoryElement.className = 'status-badge status-normal';
+                    } else if (data.iaq_category === "Good") {
+                        iaqCategoryElement.className = 'status-badge status-normal';
+                    } else if (data.iaq_category === "Moderate") {
+                        iaqCategoryElement.className = 'status-badge status-warning';
+                    } else if (data.iaq_category === "Unhealthy") {
+                        iaqCategoryElement.className = 'status-badge status-danger';
+                    } else if (data.iaq_category === "Very Unhealthy") {
+                        iaqCategoryElement.className = 'status-badge status-danger';
+                    } else if (data.iaq_category === "Hazardous") {
+                        iaqCategoryElement.className = 'status-badge status-danger';
+                    }
+                }
+            }
+            
+            // CO2
+            if (data.co2 !== undefined) {
+                const co2Element = document.getElementById('co2-value');
+                const prevCo2 = parseFloat(co2Element.textContent) || data.co2;
+                const co2Trend = document.getElementById('co2-trend');
+                
+                co2Element.textContent = data.co2.toFixed(0);
+                updateTrendIndicator(co2Trend, data.co2, prevCo2);
+                updateStatus('co2', data.co2, 400, 1000); // Normal range 400-1000 ppm
+            }
+            
+            // Pressure
+            if (data.pressure !== undefined) {
+                const pressureElement = document.getElementById('pressure-value');
+                const prevPressure = parseFloat(pressureElement.textContent) || data.pressure;
+                const pressureTrend = document.getElementById('pressure-trend');
+                
+                pressureElement.textContent = data.pressure.toFixed(0);
+                updateTrendIndicator(pressureTrend, data.pressure, prevPressure);
+                updateStatus('pressure', data.pressure, 950, 1050); // Normal range 950-1050 hPa
+            }
+            
+            // VOC
+            if (data.voc !== undefined) {
+                const vocElement = document.getElementById('voc-value');
+                const prevVoc = parseFloat(vocElement.textContent) || data.voc;
+                const vocTrend = document.getElementById('voc-trend');
+                
+                vocElement.textContent = data.voc.toFixed(2);
+                updateTrendIndicator(vocTrend, data.voc, prevVoc);
+                updateStatus('voc', data.voc, 0, 0.5); // Normal range 0-0.5 ppm
+            }
+            
+            // Update min/max/avg values
+            if (sensorData.temperature.length > 0) {
+                updateStats('temp', sensorData.temperature, '°C');
+            }
+            if (sensorData.humidity.length > 0) {
+                updateStats('humidity', sensorData.humidity, '%');
+            }
+            if (sensorData.iaq.length > 0) {
+                updateStats('iaq', sensorData.iaq, '');
+            }
+            if (sensorData.co2.length > 0) {
+                updateStats('co2', sensorData.co2, 'ppm');
+            }
+            if (sensorData.pressure.length > 0) {
+                updateStats('pressure', sensorData.pressure, 'hPa');
+            }
+            if (sensorData.voc.length > 0) {
+                updateStats('voc', sensorData.voc, 'ppm');
+            }
+        }
+        
+        function updateStats(prefix, data, unit) {
+            const min = Math.min(...data).toFixed(1);
+            const max = Math.max(...data).toFixed(1);
+            const avg = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(1);
+            
+            document.getElementById(`${prefix}-min`).textContent = `${min}${unit}`;
+            document.getElementById(`${prefix}-max`).textContent = `${max}${unit}`;
+            document.getElementById(`${prefix}-avg`).textContent = `${avg}${unit}`;
+        }
+        
+        function updateTrendIndicator(element, currentValue, previousValue) {
+            if (isNaN(previousValue)) {
+                element.className = 'trend-indicator trend-neutral';
+                element.innerHTML = '<i class="fas fa-equals"></i>';
+                return;
+            }
+            
+            if (currentValue > previousValue) {
+                element.className = 'trend-indicator trend-up';
+                element.innerHTML = '<i class="fas fa-arrow-up"></i>';
+            } else if (currentValue < previousValue) {
+                element.className = 'trend-indicator trend-down';
+                element.innerHTML = '<i class="fas fa-arrow-down"></i>';
+            } else {
+                element.className = 'trend-indicator trend-neutral';
+                element.innerHTML = '<i class="fas fa-equals"></i>';
+            }
+        }
+        
+        function updateStatus(prefix, value, minThreshold, maxThreshold) {
+            const statusElement = document.getElementById(`${prefix}-status`);
+            
+            if (value < minThreshold || value > maxThreshold) {
+                statusElement.className = 'status-badge status-danger';
+                statusElement.textContent = 'Alert';
+            } else if (value < minThreshold * 1.1 || value > maxThreshold * 0.9) {
+                statusElement.className = 'status-badge status-warning';
+                statusElement.textContent = 'Caution';
+            } else {
+                statusElement.className = 'status-badge status-normal';
+                statusElement.textContent = 'Normal';
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('refresh-btn').addEventListener('click', fetchSensorData);
+        document.getElementById('export-btn').addEventListener('click', exportToExcel);
+        
+        // Initial fetch and set up periodic refresh
+        fetchSensorData();
+        const refreshRate = parseInt(document.getElementById('refresh-rate').textContent) * 1000;
+        setInterval(fetchSensorData, refreshRate);
+    </script>
+</body>
+</html>
